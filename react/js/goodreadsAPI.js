@@ -5,11 +5,22 @@ import axios from 'axios';
 const KEY = 'RnrAsOzR76ogqVctJlYyug';
 
 // We do this because you can't config the params twice/in part now, you need to do it once in the call via axios.
-export const baseParams = {
+export const baseAPIParams = {
   format: 'xml',
   key: KEY,
 };
 
-export default axios.create({
+export const searchGoodreads = async (term) => {
+  const response = await goodreadsAPI.get('', {
+    params: {
+      q: term,
+      ...baseAPIParams,
+    },
+  });
+
+  return response;
+};
+
+export const goodreadsAPI = axios.create({
   baseURL: 'https://www.goodreads.com/search',
 });

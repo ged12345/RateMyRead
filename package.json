@@ -12,10 +12,12 @@
   "dependencies": {
     "axios": "^0.20.0",
     "react": "16.13.1",
-    "react-native": "0.63.2",
+    "react-native": "0.63.3",
     "react-native-camera": "^3.40.0",
     "react-native-gesture-handler": "^1.8.0",
-    "react-xml-parser": "^1.1.6"
+    "react-xml-parser": "^1.1.6",
+    "semantic-ui-css": "^2.4.1",
+    "semantic-ui-react": "^2.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.8.4",

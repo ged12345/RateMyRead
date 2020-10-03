@@ -31,3 +31,11 @@ target 'RateMyRead-tvOS' do
     # Pods for testing
   end
 end
+
+pod 'react-native-camera', path: '../node_modules/react-native-camera', subspecs: [
+  'TextDetector',
+  'FaceDetectorMLKit',
+  'BarcodeDetectorMLKit'
+]
+
+pod 'Firebase/Core'

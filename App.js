@@ -21,8 +21,13 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
+import {Button, Icon} from 'semantic-ui-react';
 import {RNCamera} from 'react-native-camera';
-import goodreads, {baseParams} from './react/js/goodreads.js';
+import goodreadsAPI, {
+  searchGoodreads,
+  baseAPIParams,
+} from './react/js/goodreadsAPI.js';
+import GoodreadsParser from './react/js/goodreadsParser.js';
 
 import {
   Header,
@@ -37,50 +42,49 @@ class App extends React.Component {
     super();
     this.state = {
       foundISBN: null,
+      foundText: null,
+      pictureTaken: true,
       modalVisible: false,
       cameraVisible: true,
       title: '',
       author: '',
       isbn: '',
+      goodreads: {
+        response: null,
+        requesting: false,
+      },
+      modalDisplayed: false,
     };
   }
 
   // Do we need this? Move to modal variable?
-  alert = {
-    view: null,
-    displayed: false,
-  };
 
-  goodreads = {
-    response: null,
-    requesting: false,
-  };
+  goodreadsParser = new GoodreadsParser();
 
   toggleModal(visible) {
-    this.setState({modalVisible: visible});
-    this.setState({cameraVisible: !visible});
+    this.setState({modalVisible: visible, cameraVisible: !visible});
     this.resetSearchAndDisplay();
   }
 
   resetSearchAndDisplay() {
-    this.alert.displayed = false;
-    this.alert.view = null;
-    this.goodreads.requesting = false;
-  }
-
-  searchGoodreads = async (term) => {
-    const response = await goodreads.get('', {
-      params: {
-        q: term,
-        ...baseParams,
+    this.setState((prevState) => ({
+      goodreads: {
+        ...prevState.goodreads,
+        requesting: false,
       },
-    });
-
-    return response;
+      modalDisplayed: false,
+    }));
+  }
+  togglePicture = () => {
+    // Only take one picture at a time
+    this.setState({pictureTaken: !this.state.pictureTaken});
   };
 
-  barcodeRecognized = ({barcodes}) => {
+  onBarcodeRecognized = ({barcodes}) => {
     let validBarcode = null;
+
+    if (this.state.pictureTaken !== true) return;
+
     barcodes.forEach((barcode) => {
       //console.log(barcode.data);
       // No errorCode field means the barcode is valid
@@ -92,39 +96,48 @@ class App extends React.Component {
         this.setState({foundISBN: barcode});
 
         if (
-          this.alert.displayed === true &&
-          this.goodreads.requesting === false
+          this.state.modalDisplayed === true &&
+          this.state.goodreads.requesting === false
         ) {
-          this.goodreads.requesting = true;
-          this.searchGoodreads(barcode.data)
-            .then((response) => {
-              // handle success
-              //console.log(response);
-              //this.goodreads.response = response;
-              var XMLParser = require('react-xml-parser');
-              var xml = new XMLParser().parseFromString(response.data);
-
-              // Move this to goodreads - we'll create a parser with checks, which defaults back to google books or world cat.
-              var title = xml.getElementsByTagName('best_book')[0][
-                'children'
-              ][1]['value'];
-              console.log(title);
-              var author = xml.getElementsByTagName('best_book')[0][
-                'children'
-              ][2]['children'][1]['value'];
-              this.setState({
-                title: title,
-                author: author,
-                isbn: this.state.foundISBN.data,
-              });
-              this.toggleModal();
-            })
-            .catch((error) => {
-              // handle error
-              console.log(error);
-            });
+          this.setState((prevState) => ({
+            goodreads: {
+              ...prevState.goodreads,
+              requesting: true,
+            },
+          }));
+          this.requestBarcodeData(barcode.data);
         }
       }
+    });
+  };
+
+  requestBarcodeData = (data) => {
+    searchGoodreads(data)
+      .then((response) => {
+        // handle success
+        var goodreadsData = this.goodreadsParser.parseXML(response);
+
+        this.setState({
+          title: goodreadsData['title'],
+          author: goodreadsData['author'],
+          isbn: this.state.foundISBN.data,
+        });
+        this.toggleModal();
+        this.togglePicture();
+      })
+      .catch((error) => {
+        // handle error
+        console.log(error);
+        this.togglePicture();
+      });
+  };
+
+  onTextRecognized = ({textBlocks}) => {
+    //this.setState({ detectedTexts: textBlocks.map((b) => b.value) });
+    //console.log('HERE');
+    textBlocks.forEach((textBlock) => {
+      this.setState({foundText: textBlock});
+      this.togglePicture();
     });
   };
 
@@ -137,7 +150,9 @@ class App extends React.Component {
           }}
           style={styles.scanner}
           flashMode={RNCamera.Constants.FlashMode.on}
-          onGoogleVisionBarcodesDetected={this.barcodeRecognized}></RNCamera>
+          onGoogleVisionBarcodesDetected={this.onBarcodeRecognized}
+          r
+          onTextRecognized={this.onTextRecognized}></RNCamera>
       );
     } else {
       return null;
@@ -145,11 +160,12 @@ class App extends React.Component {
   };
 
   componentDidUpdate() {
-    if (this.state.foundISBN !== null && this.alert.displayed === false) {
-      //this.alert.view = <View>{this.renderISBN(this.state.foundISBN)}</View>;
-      this.alert.displayed = true;
+    if (this.state.foundISBN !== null && this.state.modalDisplayed === false) {
+      this.setState({modalDisplayed: true});
     }
   }
+
+  /* We need an take picture icon so we're not always scanning for ISBNs and text blocks. Then we do our magic.*/
 
   render() {
     return (
@@ -179,6 +195,9 @@ class App extends React.Component {
           source={require('./assets/img/rate-my-read-logo-low-res.jpg')}
         />
         {this.renderCamera()}
+        <Button icon>
+          <Icon name="camera retro" />
+        </Button>
       </View>
     );
   }
